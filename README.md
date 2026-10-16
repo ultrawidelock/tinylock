@@ -40,11 +40,11 @@ sample builds the stock set:
 |---|---|---|
 | BLE | `stacks/bt-host.conf` | `stacks/tinyble.conf` |
 | Thread | `stacks/openthread.conf` | `stacks/tinygrid.conf` |
-| Crypto | `stacks/nrf-security.conf` | `stacks/tinypsa.conf` |
+| Crypto | `stacks/nrf-security.conf` | `stacks/tinypsa.conf`, plus `stacks/tinypsa-openthread.conf` with OpenThread |
 | DFU | none | `stacks/tinyfota.conf` |
 
 A swap replaces one stock fragment with its library fragment, for example
-`-DCONF_FILE="prj.conf;stacks/bt-host.conf;stacks/openthread.conf;stacks/tinypsa.conf"`.
+`-DCONF_FILE="prj.conf;stacks/bt-host.conf;stacks/openthread.conf;stacks/tinypsa.conf;stacks/tinypsa-openthread.conf"`.
 `overlay-release.conf` drops logging and RTT for the release image.
 
 ## License
