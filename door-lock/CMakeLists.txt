@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.20.0)
 
+# prj.conf holds the lines every build shares, stacks/*.conf one stack each.
+# With no CONF_FILE given, build the stock stacks.
+if(NOT DEFINED CONF_FILE)
+  set(CONF_FILE "prj.conf;stacks/bt-host.conf;stacks/openthread.conf;stacks/nrf-security.conf")
+endif()
+
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 # tinytalk comes in from the command line, never from a path in this file.
 if(NOT DEFINED ZEPHYR_TINYTALK_MODULE_DIR)
