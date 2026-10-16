@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.20.0)
 
-# tinytalk is the Zephyr module two directories up.
-list(APPEND ZEPHYR_EXTRA_MODULES ${CMAKE_CURRENT_SOURCE_DIR}/../..)
-
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+# tinytalk comes in from the command line, never from a path in this file.
+if(NOT DEFINED ZEPHYR_TINYTALK_MODULE_DIR)
+  message(FATAL_ERROR "tinytalk not found: pass it with -DZEPHYR_EXTRA_MODULES=<tinytalk>")
+endif()
 project(tinytalk_door_lock)
 
 target_sources(app PRIVATE src/main.c)
@@ -13,7 +14,7 @@ target_sources(app PRIVATE src/main.c)
 # the build stops if the two disagree: a code that does not match the verifier
 # fails at Pake3 looking exactly like a typo.
 execute_process(
-  COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/../../scripts/spake2p_verifier.py
+  COMMAND ${PYTHON_EXECUTABLE} ${ZEPHYR_TINYTALK_MODULE_DIR}/scripts/spake2p_verifier.py
           --from-config ${DOTCONFIG}
   OUTPUT_VARIABLE TM_PAIRING_OUT
   ERROR_VARIABLE TM_PAIRING_ERR
