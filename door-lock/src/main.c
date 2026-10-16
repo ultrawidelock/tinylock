@@ -18,7 +18,8 @@
  * The Door Lock cluster (clusters/door_lock) sits on endpoint 1 and drives
  * LED0: on while unlocked. Button 0: a short
  * press opens a basic commissioning window for WINDOW_S seconds; a press held
- * for FACTORY_RESET_MS erases the stored fabrics and reboots.
+ * for FACTORY_RESET_MS erases the stored fabrics and reboots. In a tinyfota
+ * build the short press also opens the update window.
  */
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/fs/nvs.h>
@@ -34,6 +35,10 @@
 #include <tinytalk/matter_fab_store.h>
 #include <tinytalk/matter_thread.h>
 #include <tinytalk/tm_door_lock.h>
+
+#if defined(CONFIG_TINYFOTA_RECEIVER)
+#include <tinyfota_rx.h>
+#endif
 
 LOG_MODULE_REGISTER(door_lock, LOG_LEVEL_INF);
 
@@ -72,6 +77,11 @@ static void adv_work_fn(struct k_work *work)
 	bool want = !matter_commission_has_fabric() || matter_commission_window_open();
 
 	ARG_UNUSED(work);
+#if defined(CONFIG_TINYFOTA_RECEIVER)
+	/* Connectable for the whole update window, which can outlast the
+	 * commissioning window or open while one is already running. */
+	want = want || tinyfota_window_is_open();
+#endif
 	/* The GATT table follows the advert: no commissioning service while the
 	 * node is not offering to be commissioned. -EBUSY means a link is up and
 	 * the next pass will try again. The transport repeats the last request
@@ -84,6 +94,14 @@ void matter_commission_readvertise(void)
 {
 	k_work_submit(&s_adv_work);
 }
+
+#if defined(CONFIG_TINYFOTA_RECEIVER)
+static void on_update_window(bool open)
+{
+	ARG_UNUSED(open);
+	k_work_submit(&s_adv_work);
+}
+#endif
 
 /* ---- the bolt ---------------------------------------------------------------- */
 
@@ -159,6 +177,10 @@ static void open_window_fn(struct k_work *work)
 	} else {
 		LOG_INF("commissioning window already open");
 	}
+#if defined(CONFIG_TINYFOTA_RECEIVER)
+	tinyfota_window_open(CONFIG_TINYFOTA_WINDOW_MS);
+	LOG_INF("update window open for %d ms", CONFIG_TINYFOTA_WINDOW_MS);
+#endif
 }
 static K_WORK_DEFINE(s_open_window_work, open_window_fn);
 
@@ -234,6 +256,9 @@ int main(void)
 		return 0;
 	}
 
+#if defined(CONFIG_TINYFOTA_RECEIVER)
+	tinyfota_set_window_cb(on_update_window);
+#endif
 	LOG_INF("manual pairing code %s, discriminator 0x%03x", TM_SAMPLE_MANUAL_CODE,
 		CONFIG_TINYTALK_DISCRIMINATOR);
 	matter_commission_readvertise();
