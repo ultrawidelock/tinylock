@@ -20,8 +20,6 @@
  * press opens a basic commissioning window for WINDOW_S seconds; a press held
  * for FACTORY_RESET_MS erases the stored fabrics and reboots.
  */
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/fs/nvs.h>
 #include <zephyr/kernel.h>
@@ -31,18 +29,22 @@
 
 #include <psa/crypto.h>
 
+#include <tinytalk/matter_ble.h>
 #include <tinytalk/matter_commission.h>
 #include <tinytalk/matter_fab_store.h>
 #include <tinytalk/matter_thread.h>
 #include <tinytalk/tm_door_lock.h>
 
-#include "matter_ble_zephyr.h"
-
 LOG_MODULE_REGISTER(door_lock, LOG_LEVEL_INF);
 
 #define WINDOW_S         900u
 #define FACTORY_RESET_MS 5000
-#define SRP_RETRACT_MS   2000
+/* The reboot after a factory reset waits at least SRP_RETRACT_MS, then every
+ * SRP_RETRACT_POLL_MS while the SRP removals are in flight, up to
+ * SRP_RETRACT_MAX_MS after the reset. */
+#define SRP_RETRACT_MS      2000
+#define SRP_RETRACT_POLL_MS 100
+#define SRP_RETRACT_MAX_MS  5000
 
 static const struct matter_commission_config s_matter_cfg = {
 	.vendor_id = CONFIG_TINYTALK_VENDOR_ID,
@@ -65,36 +67,16 @@ static const struct gpio_dt_spec s_button = GPIO_DT_SPEC_GET(DT_ALIAS(sw0), gpio
  * The node asks for this through matter_commission_readvertise() with its own
  * lock held, so the work is done here, on the system work queue.
  */
-static uint8_t s_svc_data[MATTER_BLE_SVC_DATA_LEN];
-
 static void adv_work_fn(struct k_work *work)
 {
 	bool want = !matter_commission_has_fabric() || matter_commission_window_open();
-	const struct bt_data ad[] = {
-		BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
-		BT_DATA(BT_DATA_SVC_DATA16, s_svc_data, sizeof(s_svc_data)),
-	};
-	int rc;
 
 	ARG_UNUSED(work);
 	/* The GATT table follows the advert: no commissioning service while the
 	 * node is not offering to be commissioned. -EBUSY means a link is up and
-	 * the next pass will try again. */
-	(void)matter_ble_publish(want);
-	(void)bt_le_adv_stop();
-	if (!want) {
-		return;
-	}
-	if (matter_ble_commissionable_svc_data(s_svc_data, sizeof(s_svc_data)) != 0) {
-		LOG_ERR("no commissionable payload");
-		return;
-	}
-	rc = bt_le_adv_start(BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONN, BT_GAP_ADV_FAST_INT_MIN_2,
-					     BT_GAP_ADV_FAST_INT_MAX_2, NULL),
-			     ad, ARRAY_SIZE(ad), NULL, 0);
-	if (rc != 0 && rc != -EALREADY) {
-		LOG_ERR("advertising failed (%d)", rc);
-	}
+	 * the next pass will try again. The transport repeats the last request
+	 * when a connection ends, and logs every connect and disconnect. */
+	(void)matter_ble_advertise(want);
 }
 static K_WORK_DEFINE(s_adv_work, adv_work_fn);
 
@@ -102,35 +84,6 @@ void matter_commission_readvertise(void)
 {
 	k_work_submit(&s_adv_work);
 }
-
-/* A connection stops connectable advertising; the next one starts when the
- * connection object is free again. */
-static void on_recycled(void)
-{
-	k_work_submit(&s_adv_work);
-}
-
-/* Every link, not only the one that writes C1: a peer that connects and never
- * writes shows up nowhere else. */
-static void on_connected(struct bt_conn *conn, uint8_t err)
-{
-	char addr[BT_ADDR_LE_STR_LEN];
-
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-	LOG_INF("BLE connected: %s (err 0x%02x)", addr, err);
-}
-
-static void on_disconnected(struct bt_conn *conn, uint8_t reason)
-{
-	ARG_UNUSED(conn);
-	LOG_INF("BLE disconnected (0x%02x)", reason);
-}
-
-BT_CONN_CB_DEFINE(s_conn_cb) = {
-	.connected = on_connected,
-	.disconnected = on_disconnected,
-	.recycled = on_recycled,
-};
 
 /* ---- the bolt ---------------------------------------------------------------- */
 
@@ -146,10 +99,23 @@ static struct gpio_callback s_button_cb;
 /* -1 until this boot sees a press: the press held through a factory-reset
  * reboot ends here as a bare release, which is not a short press. */
 static int64_t s_pressed_at = -1;
+/* When the factory reset started, for the SRP_RETRACT_MAX_MS cap. */
+static int64_t s_reset_at;
 
 static void reboot_fn(struct k_work *work)
 {
+#if defined(CONFIG_TINYTALK_HAS_THREAD)
+	if (matter_thread_advertise_pending()) {
+		if (k_uptime_get() - s_reset_at < SRP_RETRACT_MAX_MS) {
+			(void)k_work_reschedule(k_work_delayable_from_work(work),
+						K_MSEC(SRP_RETRACT_POLL_MS));
+			return;
+		}
+		LOG_WRN("SRP removal still pending after %d ms; rebooting", SRP_RETRACT_MAX_MS);
+	}
+#else
 	ARG_UNUSED(work);
+#endif
 	/* The fabric erase is logical: the old records, operational keys among
 	 * them, stay in NVS until garbage collection, and OpenThread's dataset,
 	 * network key and SRP key are not the node's to erase. Clearing the
@@ -175,9 +141,10 @@ static void factory_reset_fn(struct k_work *work)
 		return;
 	}
 	LOG_WRN("button held: factory reset");
+	s_reset_at = k_uptime_get();
 	(void)gpio_pin_set_dt(&s_led, 1);
 	(void)matter_fab_erase();
-#if defined(CONFIG_TINYTALK_THREAD)
+#if defined(CONFIG_TINYTALK_HAS_THREAD)
 	matter_thread_advertise_reset();
 #endif
 	(void)k_work_reschedule(&s_reboot_work, K_MSEC(SRP_RETRACT_MS));
@@ -256,7 +223,7 @@ int main(void)
 		LOG_ERR("settings did not start (%d)", rc);
 		return 0;
 	}
-	rc = bt_enable(NULL);
+	rc = matter_ble_start();
 	if (rc != 0) {
 		LOG_ERR("Bluetooth did not start (%d)", rc);
 		return 0;
