@@ -1,0 +1,89 @@
+# Part of stacks/tinyfota.conf, which has the build command that opts in to
+# this file. tinyfota's samples/door-lock-fragment/pm_static.yml at f85f24e, verbatim
+# below; "README.md beside this file" is that directory's.
+
+# nRF52833 flash map for an application with tinyfota, pinned: the same
+# addresses as samples/nrf52833/pm_static.yml, which says why each partition is
+# where it is. `make tooling` checks the two agree.
+#
+#  0x00000  mcuboot            40,960 B   bootloader + the tinyfota applier
+#  0x0a000  mcuboot_pad           512 B   image header
+#  0x0a200  app               433,664 B   the application
+#  0x74000  patch_staging      32,768 B   one delta patch and its control pages
+#  0x7c000  settings_storage   16,384 B   four NVS sectors
+#  0x80000  end
+
+mcuboot:
+  address: 0x0
+  end_address: 0xa000
+  region: flash_primary
+  size: 0xa000
+  placement:
+    align:
+      end: 0x1000
+    before:
+      - mcuboot_primary
+
+mcuboot_pad:
+  address: 0xa000
+  end_address: 0xa200
+  region: flash_primary
+  size: 0x200
+  placement:
+    align:
+      start: 0x1000
+    before:
+      - mcuboot_primary_app
+
+app:
+  address: 0xa200
+  end_address: 0x74000
+  region: flash_primary
+  size: 0x69e00
+
+mcuboot_primary_app:
+  address: 0xa200
+  end_address: 0x74000
+  region: flash_primary
+  size: 0x69e00
+  orig_span: &id002
+    - app
+  span: *id002
+
+mcuboot_primary:
+  address: 0xa000
+  end_address: 0x74000
+  region: flash_primary
+  size: 0x6a000
+  orig_span: &id001
+    - app
+    - mcuboot_pad
+  span: *id001
+
+patch_staging:
+  address: 0x74000
+  end_address: 0x7c000
+  region: flash_primary
+  size: 0x8000
+  placement:
+    align:
+      start: 0x1000
+    before:
+      - settings_storage
+
+settings_storage:
+  address: 0x7c000
+  end_address: 0x80000
+  region: flash_primary
+  size: 0x4000
+  placement:
+    align:
+      start: 0x1000
+    before:
+      - end
+
+sram_primary:
+  address: 0x20000000
+  end_address: 0x20020000
+  region: sram_primary
+  size: 0x20000
