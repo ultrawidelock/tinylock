@@ -47,6 +47,24 @@ A swap replaces one stock fragment with its library fragment, for example
 `-DCONF_FILE="prj.conf;stacks/bt-host.conf;stacks/openthread.conf;stacks/tinypsa.conf;stacks/tinypsa-openthread.conf"`.
 `overlay-release.conf` drops logging and RTT for the release image.
 
+## Sizes
+
+The door-lock on decawave_dwm3001cdk, NCS v3.3.0, LTO on, from
+`scripts/size_matrix.sh` on 2026-10-17: tinylock b10dfc5, tinytalk 4e14cfc,
+tinyble 93eb8b3, tinygrid b8e3b4a, tinypsa d556143. The stock rows are built
+with tinytalk as the only module.
+
+| Set | Flash (B) | RAM (B) |
+|---|---|---|
+| stock | 304,584 | 97,440 |
+| stock+overlay-release | 282,496 | 88,928 |
+| tinyble+tinygrid+tinypsa | 207,144 | 69,592 |
+| tinyble+tinygrid+tinypsa+overlay-release | 195,048 | 61,208 |
+
+The last row is the release image with every library swapped in: 87,448 B
+less flash and 27,720 B less RAM than the stock release. It passed an Apple
+Home add, lock and unlock on the board on 2026-10-17.
+
 ## License
 
 Not decided yet. No license is granted until a LICENSE file is added.
