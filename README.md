@@ -65,6 +65,31 @@ The last row is the release image with every library swapped in: 87,448 B
 less flash and 27,720 B less RAM than the stock release. It passed an Apple
 Home add, lock and unlock on the board on 2026-10-17.
 
+### Where the release image goes
+
+The last row above, split by source. Each sized symbol in `zephyr.elf` is
+assigned to the file that defines it, from the DWARF debug info: code by the
+outermost frame `addr2line -i` gives for its address, data by the
+`DW_AT_decl_file` of its variable. Zephyr's `rom_report` cannot do this with
+LTO on: it puts 98% of the image under "(no paths)". LTO also inlines across
+modules, so code inlined from one library counts toward its caller. RAM
+includes initialised data, which also takes the same bytes in flash.
+
+| Component | Flash (B) | % of flash | RAM (B) | % of RAM |
+|---|---|---|---|---|
+| tinytalk (Matter) | 50,228 | 25.8% | 19,811 | 32.4% |
+| tinygrid (Thread) | 16,926 | 8.7% | 9,309 | 15.2% |
+| tinypsa (crypto) | 15,346 | 7.9% | 1,501 | 2.5% |
+| tinyble (BLE host) | 4,861 | 2.5% | 2,099 | 3.4% |
+| **tiny\* total** | **87,361** | **44.8%** | **32,720** | **53.5%** |
+| SoftDevice Controller and MPSL (Nordic binary libraries) | 51,426 | 26.4% | 3,202 | 5.2% |
+| Zephyr (kernel, drivers, subsystems, generated code) | 23,540 | 12.1% | 19,319 | 31.6% |
+| nRF 802.15.4 radio driver | 22,797 | 11.7% | 2,465 | 4.0% |
+| NCS and hal_nordic glue | 3,376 | 1.7% | 174 | 0.3% |
+| C library and compiler runtime | 2,026 | 1.0% | 0 | 0% |
+| door-lock app | 954 | 0.5% | 156 | 0.3% |
+| Unattributed and alignment padding | 3,568 | 1.8% | 3,172 | 5.2% |
+
 ## License
 
 Not decided yet. No license is granted until a LICENSE file is added.
