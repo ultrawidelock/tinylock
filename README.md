@@ -15,7 +15,7 @@ line.
 | tinypsa | PSA Crypto provider, replaces nrf_security | `stacks/tinypsa.conf` |
 | tinyble | BLE peripheral host on the SoftDevice Controller, replaces the Zephyr BT host | `stacks/tinyble.conf` |
 | tinygrid | Thread 1.1 child, replaces OpenThread | `stacks/tinygrid.conf` |
-| tinyfota | Signed in-place delta DFU, MCUboot applier | `stacks/tinyfota.conf` |
+| tinyfota | Signed in-place delta DFU, MCUboot applier | `stacks/tinyfota.conf`, or `stacks/tinyfota-tinyble.conf` with tinyble |
 
 ## Build
 
@@ -41,7 +41,7 @@ sample builds the stock set:
 | BLE | `stacks/bt-host.conf` | `stacks/tinyble.conf` |
 | Thread | `stacks/openthread.conf` | `stacks/tinygrid.conf` |
 | Crypto | `stacks/nrf-security.conf` | `stacks/tinypsa.conf`, plus `stacks/tinypsa-openthread.conf` with OpenThread |
-| DFU | none | `stacks/tinyfota.conf` |
+| DFU | none | `stacks/tinyfota.conf` on the Zephyr host, `stacks/tinyfota-tinyble.conf` on tinyble |
 
 A swap replaces one stock fragment with its library fragment, for example
 `-DCONF_FILE="prj.conf;stacks/bt-host.conf;stacks/openthread.conf;stacks/tinypsa.conf;stacks/tinypsa-openthread.conf"`.
@@ -64,6 +64,20 @@ with tinytalk as the only module.
 The last row is the release image with every library swapped in: 87,448 B
 less flash and 27,720 B less RAM than the stock release. It passed an Apple
 Home add, lock and unlock on the board on 2026-10-17.
+
+The same libraries set plus `stacks/tinyfota-tinyble.conf`, built with
+sysbuild and MCUboot from `stacks/tinyfota/` on 2026-10-17 (tinylock
+492ba8a, tinyble 8ecda5d, tinyfota 7ec5d9c, the other modules as above):
+
+| Image | Flash (B) | RAM (B) |
+|---|---|---|
+| door-lock | 215,824 | 70,680 |
+| MCUboot | 25,512 | 14,464 |
+
+On the board on 2026-10-17 it passed an Apple Home add, then a delta
+update over SMP (`tinyfota push`, 4,186 B staged in 4.4 s) and one over
+tinyfota's native frames (`tinyfota push --native`, 4,177 B), with the
+fabrics kept and Home controlling the lock after each.
 
 ### Where the release image goes
 
