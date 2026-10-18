@@ -75,10 +75,11 @@ tinytalk 4e14cfc, tinyble 8ecda5d, tinygrid b8e3b4a, tinypsa d556143):
 | Set | Flash (B) | RAM (B) |
 |---|---|---|
 | tinyble+tinygrid+tinypsa+overlay-release | 195,096 | 61,208 |
-| tinyble+tinygrid+tinygrid-radio+tinypsa+overlay-release | 172,416 | 58,968 |
+| tinyble+tinygrid+tinygrid-radio+tinypsa+overlay-release | 172,448 | 58,968 |
 
-22,680 B less flash and 2,240 B less RAM. tinygrid's driver has not run on
-hardware yet: this image is not board-tested.
+22,648 B less flash and 2,240 B less RAM. It passed an Apple Home add, lock
+and unlock on the board on 2026-10-18, the first run of tinygrid's driver
+on hardware.
 
 The same libraries set plus `stacks/tinyfota-tinyble.conf`, built with
 sysbuild and MCUboot from `stacks/tinyfota/` on 2026-10-17 (tinylock
