@@ -41,7 +41,7 @@ sample builds the stock set:
 | Seam | Stock fragment | Library fragment |
 |---|---|---|
 | BLE | `stacks/bt-host.conf` | `stacks/tinyble.conf` |
-| Thread | `stacks/openthread.conf` | `stacks/tinygrid.conf` |
+| Thread | `stacks/openthread.conf` | `stacks/tinygrid.conf`, plus `stacks/tinygrid-radio.conf` for tinygrid's own radio driver in place of Nordic's |
 | Crypto | `stacks/nrf-security.conf` | `stacks/tinypsa.conf`, plus `stacks/tinypsa-openthread.conf` with OpenThread |
 | DFU | none | `stacks/tinyfota.conf` on the Zephyr host, `stacks/tinyfota-tinyble.conf` on tinyble |
 
@@ -66,6 +66,19 @@ with tinytalk as the only module.
 The last row is the release image with every library swapped in: 87,448 B
 less flash and 27,720 B less RAM than the stock release. It passed an Apple
 Home add, lock and unlock on the board on 2026-10-17.
+
+`stacks/tinygrid-radio.conf` after `stacks/tinygrid.conf` has tinygrid drive
+the radio itself, in MPSL timeslots, instead of linking Nordic's 802.15.4
+driver. The release set with and without it on 2026-10-18 (tinylock 208d96b,
+tinytalk 4e14cfc, tinyble 8ecda5d, tinygrid b8e3b4a, tinypsa d556143):
+
+| Set | Flash (B) | RAM (B) |
+|---|---|---|
+| tinyble+tinygrid+tinypsa+overlay-release | 195,096 | 61,208 |
+| tinyble+tinygrid+tinygrid-radio+tinypsa+overlay-release | 172,416 | 58,968 |
+
+22,680 B less flash and 2,240 B less RAM. tinygrid's driver has not run on
+hardware yet: this image is not board-tested.
 
 The same libraries set plus `stacks/tinyfota-tinyble.conf`, built with
 sysbuild and MCUboot from `stacks/tinyfota/` on 2026-10-17 (tinylock
