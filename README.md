@@ -70,7 +70,7 @@ Home add, lock and unlock on the board on 2026-10-17.
 `stacks/tinygrid-radio.conf` after `stacks/tinygrid.conf` has tinygrid drive
 the radio itself, in MPSL timeslots, instead of linking Nordic's 802.15.4
 driver. The release set with and without it on 2026-10-18 (tinylock 208d96b,
-tinytalk 4e14cfc, tinyble 8ecda5d, tinygrid b8e3b4a, tinypsa d556143):
+tinytalk 4e14cfc, tinyble 8ecda5d, tinygrid 8db2c23, tinypsa d556143):
 
 | Set | Flash (B) | RAM (B) |
 |---|---|---|
