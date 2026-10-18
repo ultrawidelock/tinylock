@@ -19,7 +19,9 @@ line.
 
 ## Build
 
-From inside an nRF Connect SDK v3.3.0 workspace:
+`eval "$(./bootstrap)"` clones or updates every library next to this
+checkout, installs nrfutil and NCS v3.3.0 when they are missing, and sets
+`TINYLOCK_MODULES`. Then, from inside an nRF Connect SDK v3.3.0 workspace:
 
 ```
 west build -p always -b decawave_dwm3001cdk -d <tinylock>/build/<dir> <tinylock>/door-lock -- \
