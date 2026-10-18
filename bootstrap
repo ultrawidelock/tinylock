@@ -1,0 +1,104 @@
+#!/bin/sh
+# Set up everything the door-lock build needs, or say exactly what is
+# missing. Safe to run again. Builds nothing.
+#
+#   eval "$(./bootstrap)"
+#
+# Each library is cloned from where this repository's origin points, into
+# ../<library>. A checkout already there is checked, fetched and
+# fast-forwarded when it is clean and tracks a branch; otherwise it is left
+# as it is. nrfutil comes from Homebrew when it is missing, then NCS v3.3.0
+# (SDK and toolchain) from nrfutil sdk-manager.
+#
+# Progress goes to stderr. Only when every step succeeds does stdout get
+# the TINYLOCK_MODULES line for scripts/size_matrix.sh, so the eval above
+# sets nothing after a failure.
+
+set -u
+
+libs="tinytalk tinyble tinypsa tinygrid tinyfota"
+ncs=v3.3.0
+here=$(cd "$(dirname "$0")" && pwd)
+parent=$(dirname "$here")
+origin=$(git -C "$here" remote get-url origin) || {
+	echo "no origin remote in $here: the libraries are cloned from next to it" >&2
+	exit 1
+}
+base=${origin%/*}
+
+# git@host:owner/name.git, https://host/owner/name -> owner/name
+slug() {
+	s=${1%.git}
+	name=${s##*[:/]}
+	s=${s%[:/]*}
+	echo "${s##*[:/]}/$name"
+}
+
+# Clones or updates one library. Fails when it cannot be used.
+library() {
+	lib=$1
+	dir="$parent/$lib"
+	want="$base/$lib.git"
+	if [ ! -e "$dir" ]; then
+		echo "$lib: cloning into $dir" >&2
+		git clone -q "$want" "$dir" || return 1
+		return 0
+	fi
+	if ! git -C "$dir" rev-parse -q --verify HEAD >/dev/null 2>&1; then
+		echo "$lib: $dir is not a usable checkout (an interrupted clone?): move it aside and run again" >&2
+		return 1
+	fi
+	have=$(git -C "$dir" remote get-url origin 2>/dev/null)
+	if [ "$(slug "$have")" != "$(slug "$want")" ]; then
+		echo "$lib: origin is '$have', not '$want': using it as it is" >&2
+		return 0
+	fi
+	if ! git -C "$dir" fetch -q origin; then
+		echo "$lib: fetch failed: using it as it is" >&2
+	elif [ -n "$(git -C "$dir" status --porcelain)" ]; then
+		echo "$lib: local changes: not updated" >&2
+	elif git -C "$dir" merge -q --ff-only '@{u}' >/dev/null 2>&1; then
+		echo "$lib: up to date at $(git -C "$dir" rev-parse --short HEAD)" >&2
+	else
+		echo "$lib: no upstream branch to fast-forward to: not updated" >&2
+	fi
+}
+
+# True when west runs inside the NCS toolchain.
+toolchain() {
+	nrfutil sdk-manager toolchain launch --ncs-version "$ncs" -- west --version >/dev/null 2>&1
+}
+
+rc=0
+modules=
+for lib in $libs; do
+	if library "$lib"; then
+		modules="$modules${modules:+;}$parent/$lib"
+	else
+		rc=1
+	fi
+done
+
+if ! command -v nrfutil >/dev/null 2>&1 && command -v brew >/dev/null 2>&1; then
+	echo "nrfutil: installing with Homebrew" >&2
+	brew install --cask nrfutil >&2
+fi
+if ! command -v nrfutil >/dev/null 2>&1; then
+	echo "nrfutil not found: download it from https://www.nordicsemi.com/Products/Development-tools/nRF-Util/Download, chmod +x it and put it on PATH" >&2
+	rc=1
+elif toolchain; then
+	echo "NCS $ncs: toolchain ready" >&2
+else
+	echo "NCS $ncs: installing the SDK and toolchain, a large download" >&2
+	nrfutil sdk-manager --help >/dev/null 2>&1 || nrfutil install sdk-manager >&2
+	nrfutil sdk-manager install "$ncs" >&2
+	if toolchain; then
+		echo "NCS $ncs: toolchain ready" >&2
+	else
+		echo "NCS $ncs: install failed, see the output above" >&2
+		rc=1
+	fi
+fi
+
+[ $rc -eq 0 ] && echo "export TINYLOCK_MODULES=\"$modules\""
+exit $rc
