@@ -52,7 +52,7 @@ A swap replaces one stock fragment with its library fragment, for example
 ## Sizes
 
 The door-lock on decawave_dwm3001cdk, NCS v3.3.0, LTO on, from
-`scripts/size_matrix.sh` on 2026-10-17: tinylock b10dfc5, tinytalk 4e14cfc,
+`scripts/size_matrix.sh` on 2026-10-17: tinylock 2fb2637, tinytalk 4e14cfc,
 tinyble 93eb8b3, tinygrid b8e3b4a, tinypsa d556143. The stock rows are built
 with tinytalk as the only module.
 
@@ -69,7 +69,7 @@ Home add, lock and unlock on the board on 2026-10-17.
 
 The same libraries set plus `stacks/tinyfota-tinyble.conf`, built with
 sysbuild and MCUboot from `stacks/tinyfota/` on 2026-10-17 (tinylock
-492ba8a, tinyble 8ecda5d, tinyfota 7ec5d9c, the other modules as above):
+6e22bd8, tinyble 8ecda5d, tinyfota 7ec5d9c, the other modules as above):
 
 | Image | Flash (B) | RAM (B) |
 |---|---|---|
