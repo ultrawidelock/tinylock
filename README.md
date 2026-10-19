@@ -139,4 +139,4 @@ includes initialised data, which also takes the same bytes in flash.
 
 ## License
 
-Not decided yet. No license is granted until a LICENSE file is added.
+Apache-2.0, see LICENSE and NOTICE. Every tiny* library is Apache-2.0 as well.
