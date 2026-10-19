@@ -14,6 +14,7 @@ endif()
 project(tinytalk_door_lock)
 
 target_sources(app PRIVATE src/main.c)
+target_sources_ifdef(CONFIG_TINYCRED app PRIVATE src/cred.c)
 
 # The manual pairing code, for the boot log. scripts/spake2p_verifier.py
 # re-derives the verifier from the passcode in this build's .config first, and

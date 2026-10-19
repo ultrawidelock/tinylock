@@ -36,6 +36,10 @@
 #include <tinytalk/matter_thread.h>
 #include <tinytalk/tm_door_lock.h>
 
+#if defined(CONFIG_TINYCRED)
+#include "cred.h"
+#endif
+
 #if defined(CONFIG_TINYFOTA_RECEIVER)
 #include <tinyfota_rx.h>
 #endif
@@ -86,7 +90,19 @@ static void adv_work_fn(struct k_work *work)
 	 * node is not offering to be commissioned. -EBUSY means a link is up and
 	 * the next pass will try again. The transport repeats the last request
 	 * when a connection ends, and logs every connect and disconnect. */
+#if defined(CONFIG_TINYCRED)
+	/* One advertiser: the commissioning advertisement while it is wanted,
+	 * the credential reader's the rest of the time. Off before on. */
+	if (want) {
+		cred_advertise(false);
+	}
+#endif
 	(void)matter_ble_advertise(want);
+#if defined(CONFIG_TINYCRED)
+	if (!want) {
+		cred_advertise(true);
+	}
+#endif
 }
 static K_WORK_DEFINE(s_adv_work, adv_work_fn);
 
@@ -250,6 +266,9 @@ int main(void)
 		LOG_ERR("Bluetooth did not start (%d)", rc);
 		return 0;
 	}
+#if defined(CONFIG_TINYCRED)
+	cred_configure();
+#endif
 	rc = matter_commission_init(&s_matter_cfg);
 	if (rc != 0) {
 		LOG_ERR("Matter node did not start (%d)", rc);
@@ -258,6 +277,9 @@ int main(void)
 
 #if defined(CONFIG_TINYFOTA_RECEIVER)
 	tinyfota_set_window_cb(on_update_window);
+#endif
+#if defined(CONFIG_TINYCRED)
+	(void)cred_start();
 #endif
 	LOG_INF("manual pairing code %s, discriminator 0x%03x", TM_SAMPLE_MANUAL_CODE,
 		CONFIG_TINYTALK_DISCRIMINATOR);
