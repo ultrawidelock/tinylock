@@ -21,7 +21,9 @@
 #include <tinycred/ble_tinyble.h>
 #include <tinycred/reader.h>
 #include <tinytalk/tm_door_lock.h>
+#include <tinyuwb/hw.h>
 #include <tinyuwb/range.h>
+#include <tinyuwb/uwb.h>
 
 #include <errno.h>
 #include <string.h>
@@ -53,7 +55,8 @@ static void bolt(bool unlocked)
 		return;
 	}
 	s_granted = unlocked;
-	LOG_INF("approach: %s", unlocked ? "unlock" : "relock");
+	LOG_INF("approach: %s at %lld ms", unlocked ? "unlock" : "relock",
+		(long long)k_uptime_get());
 	tm_door_lock_actuate(state);
 	tc_reader_notify_unlock(unlocked);
 	tm_door_lock_set(state, OP_SOURCE_ALIRO);
@@ -62,7 +65,7 @@ static void bolt(bool unlocked)
 static void loop(void *a, void *b, void *c)
 {
 	uint32_t last_gen = tu_rs_generation(), last_obs = last_gen;
-	int64_t flap_hold = 0;
+	int64_t flap_hold = 0, last_status_ms = 0;
 	bool session_was = false;
 
 	ARG_UNUSED(a);
@@ -76,6 +79,29 @@ static void loop(void *a, void *b, void *c)
 		int32_t cm = 0;
 
 		tc_reader_status_tick(now);
+		if (session && now - last_status_ms >= 2000) {
+			struct tu_round_stats rs;
+			struct tu_hw_stats hs;
+			uint32_t dbg[5];
+			int32_t last = -1;
+			int64_t age = -1;
+
+			last_status_ms = now;
+			tu_round_stats_get(&rs);
+			tu_hw_stats_get(&hs);
+			tu_hw_debug(dbg);
+			(void)tu_rs_last_range(&last, NULL, NULL, NULL, &age);
+			LOG_INF("uwb: listen=%d irq=%u tx=%u rx_arm=%u rx_ok=%u rx_to=%u rx_err=%u "
+				"[phe %u fce %u fsl %u sto %u pto %u fto %u arfe %u cia %u finfo 0x%08x] | "
+				"status=0x%08x state=0x%08x chan=0x%04x pin=%u | "
+				"pp=%u arm=%u/%u poll=%u/%u resp=%u final=%u range=%u | gen=%u cm=%d",
+				tu_listening(), hs.irq, hs.tx_done, hs.rx_arm, hs.rx_ok, hs.rx_to,
+				hs.rx_err, hs.e_phe, hs.e_fce, hs.e_fsl, hs.e_sto, hs.e_pto, hs.e_fto,
+				hs.e_arfe, hs.e_cia, hs.last_finfo, dbg[0], dbg[1], dbg[3], dbg[4],
+				rs.prepoll_ok, rs.poll_arm, rs.arm_fail, rs.poll_ok, rs.poll_fail,
+				rs.resp_tx, rs.final_data, rs.range, gen, last);
+			(void)age;
+		}
 		if (session && !session_was) {
 			/* The RSSI gate holds ranging off until the phone is at
 			 * the door, so the session coming up is the approach
@@ -209,8 +235,12 @@ void cred_configure(void)
 int cred_start(void)
 {
 	uint8_t reader_id[32], verif[65], grk[16];
-	int rc = tc_reader_start_attached();
+	int rc;
 
+	/* Installs the transaction callbacks on the transport; the attached
+	 * start alone does not. */
+	(void)tc_reader_ble_prepare();
+	rc = tc_reader_start_attached();
 	if (rc != 0) {
 		LOG_ERR("credential reader did not start (%d)", rc);
 		return rc;
