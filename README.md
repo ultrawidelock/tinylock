@@ -13,7 +13,7 @@ line.
 |---|---|---|
 | tinytalk | Matter node: PASE, CASE, Interaction Model, clusters | every build |
 | tinypsa | PSA Crypto provider, replaces nrf_security | `stacks/tinypsa.conf` |
-| tinyble | BLE peripheral host on the SoftDevice Controller, replaces the Zephyr BT host | `stacks/tinyble.conf` |
+| tinyble | BLE peripheral host on the SoftDevice Controller or Zephyr's own controller, replaces the Zephyr BT host | `stacks/tinyble.conf`, plus `stacks/tinyble-zll.conf` and its overlay for Zephyr's controller |
 | tinygrid | Thread 1.1 child, replaces OpenThread | `stacks/tinygrid.conf` |
 | tinyfota | Signed in-place delta DFU, MCUboot applier | `stacks/tinyfota.conf`, or `stacks/tinyfota-tinyble.conf` with tinyble |
 
@@ -80,6 +80,23 @@ tinytalk 4e14cfc, tinyble 8ecda5d, tinygrid 8db2c23, tinypsa d556143):
 22,648 B less flash and 2,240 B less RAM. It passed an Apple Home add, lock
 and unlock on the board on 2026-10-18, the first run of tinygrid's driver
 on hardware.
+
+`stacks/tinyble-zll.conf` with `stacks/tinyble-zll.overlay` puts tinyble on
+Zephyr's own Bluetooth controller instead of the SoftDevice Controller, and
+tinygrid's radio then runs as an event in that controller's scheduler, so no
+Nordic binary is linked (MPSL goes with the SoftDevice Controller). The
+full set with every library, tinyfota, tinyuwb and tinycred, release
+overlay, built with sysbuild on 2026-10-20:
+
+| Controller | Flash (B) | RAM (B) |
+|---|---|---|
+| SoftDevice Controller and MPSL | 217,652 | 74,584 |
+| Zephyr controller | 202,564 | 75,032 |
+
+15,088 B less flash and 448 B more RAM. On the board on 2026-10-20 the
+Zephyr-controller image passed an Apple Home add over BLE and Thread, then
+the credential transaction, UWB ranging and an approach unlock with the
+phone, Thread serving the Home subscriptions throughout.
 
 The same libraries set plus `stacks/tinyfota-tinyble.conf`, built with
 sysbuild and MCUboot from `stacks/tinyfota/` on 2026-10-17 (tinylock
