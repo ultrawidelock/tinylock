@@ -1,0 +1,18 @@
+/* The DW3110 inside the DWM3001C module, for stacks/tinyuwb.conf. The board's &spi3
+ * already carries SCK P0.03, MOSI P0.08, MISO P0.29 and CS P1.06; the three side-band
+ * lines are the module's IRQ, RESETn and WAKEUP. 8 MHz is the proven bring-up rate. */
+
+&spi3 {
+	dw3000: dw3000@0 {
+		compatible = "tinyuwb,dw3000";
+		reg = <0>;
+		spi-max-frequency = <8000000>;
+		reset-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
+		irq-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+		wakeup-gpios = <&gpio1 19 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&gpio1 {
+	status = "okay";
+};
