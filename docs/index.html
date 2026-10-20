@@ -1,0 +1,23 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>tinylock</title>
+<meta name=description content="A Matter door lock on an nRF52833, unlocked by a phone over UWB.">
+<style>
+:root{color-scheme:light dark;--m:light-dark(#6b6b66,#8e8e89);background:light-dark(#fafaf8,#0c0c0b);color:light-dark(#161615,#ebebe8);font:13px/2 ui-monospace,SFMono-Regular,Menlo,monospace}
+body{margin:0;height:100svh;display:grid;place-items:center}main{width:min(34rem,100% - 3rem)}
+h1{font:inherit;margin:0}p{margin:0 0 2.5em;color:var(--m)}p:last-child{margin:0}a{color:inherit;text-underline-offset:.3em}::selection{background:light-dark(#161615,#ebebe8);color:light-dark(#fafaf8,#0c0c0b)}
+table{width:100%;border-spacing:0;margin-bottom:2.5em}td{padding:0 2ch 0 0;white-space:nowrap}td+td{color:var(--m)}td:nth-child(3){width:100%}td:last-child{padding-right:0;text-align:right;color:inherit}
+b{display:block;height:1px;background:currentColor}tr:last-child td{border-top:1px solid var(--m);padding-top:.6em}tr:nth-last-child(2) td{padding-bottom:.6em}
+@media(prefers-reduced-motion:no-preference){b{animation:g 1.6s cubic-bezier(.16,1,.3,1) both}}@keyframes g{from{width:0}}
+</style>
+<main><h1>tinylock</h1><p>A Matter door lock on an nRF52833: commissioned over BLE, run over Thread, unlocked by a phone over UWB.</p>
+<table>
+<tr><td>tinytalk<td>Matter<td><b></b><td>52.6
+<tr><td>tinygrid<td>Thread<td><b style=width:36.6%></b><td>19.3
+<tr><td>tinypsa<td>crypto<td><b style=width:33.8%></b><td>17.8
+<tr><td>tinycred<td>Aliro<td><b style=width:24.1%></b><td>12.7
+<tr><td>tinyuwb<td>UWB<td><b style=width:16.1%></b><td>8.5
+<tr><td>tinyble<td>BLE<td><b style=width:12.8%></b><td>6.7
+<tr><td>tinyfota<td>DFU<td><b style=width:8.9%></b><td>4.7
+<tr><td>image<td><td><td>197.9
+</table>
+<p>KB of flash, LTO release build. The stock stacks take 275.9 KB without UWB, credentials or DFU. <a id=s href=https://github.com/>Source</a></p></main>
+<script>s.href+=location.host.split('.')[0]+'/tinylock'</script>
