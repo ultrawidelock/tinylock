@@ -39,17 +39,23 @@ LOG_MODULE_REGISTER(cred, LOG_LEVEL_INF);
 static K_SEM_DEFINE(s_range_sig, 0, 1);
 static struct tc_approach s_approach;
 static bool s_granted, s_present;
+static bool s_started; /* the reader is up: the phone can be told things */
+static bool s_self;    /* bolt() is moving the bolt: not a controller */
 
 static void on_range(void)
 {
 	k_sem_give(&s_range_sig);
 }
 
-/* The bolt, the phone (Reader Status Unsecured/Secured, the Wallet
- * animation), then the tile. Once per transition. */
+/* The phone first (Reader Status Unsecured/Secured, the Wallet animation),
+ * whether or not the bolt has to move: its grant is what it is shown. Then
+ * the bolt and the tile, only when the bolt does move; the LockOperation
+ * event names the Door Lock user the credential is filed under. Once per
+ * transition. */
 static void bolt(bool unlocked)
 {
 	uint8_t state = unlocked ? MATTER_DL_LOCK_STATE_UNLOCKED : MATTER_DL_LOCK_STATE_LOCKED;
+	uint16_t user = 0u;
 
 	if (s_granted == unlocked) {
 		return;
@@ -57,9 +63,22 @@ static void bolt(bool unlocked)
 	s_granted = unlocked;
 	LOG_INF("approach: %s at %lld ms", unlocked ? "unlock" : "relock",
 		(long long)k_uptime_get());
-	tm_door_lock_actuate(state);
 	tc_reader_notify_unlock(unlocked);
-	tm_door_lock_set(state, OP_SOURCE_ALIRO);
+	if (tm_door_lock_state() == state) {
+		return; /* a controller got there first */
+	}
+	s_self = true;
+	tm_door_lock_actuate(state);
+	s_self = false;
+	(void)tc_reader_authenticated_user_index(&user);
+	tm_door_lock_set_user(state, OP_SOURCE_ALIRO, user);
+}
+
+void cred_bolt_moved(uint8_t lock_state)
+{
+	if (s_started && !s_self) {
+		tc_reader_notify_unlock(lock_state == MATTER_DL_LOCK_STATE_UNLOCKED);
+	}
 }
 
 static void loop(void *a, void *b, void *c)
@@ -252,6 +271,7 @@ int cred_start(void)
 	tc_approach_init(&s_approach, NULL);
 	tu_rs_set_range_listener(on_range);
 	k_thread_start(cred_thread);
+	s_started = true;
 	return 0;
 }
 

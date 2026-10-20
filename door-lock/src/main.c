@@ -125,6 +125,9 @@ void tm_door_lock_actuate(uint8_t lock_state)
 {
 	(void)gpio_pin_set_dt(&s_led, lock_state == MATTER_DL_LOCK_STATE_UNLOCKED);
 	LOG_INF("door %s", lock_state == MATTER_DL_LOCK_STATE_UNLOCKED ? "unlocked" : "locked");
+#if defined(CONFIG_TINYCRED)
+	cred_bolt_moved(lock_state);
+#endif
 }
 
 /* ---- the button --------------------------------------------------------------- */
