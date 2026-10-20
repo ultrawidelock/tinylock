@@ -14,8 +14,7 @@ over Thread, unlocked by a phone over UWB. It owns no library code.
 | tinyfota    | Delta DFU     |   4.7 KB |  1.0 KB |
 | Whole image |               | 197.9 KB | 73.3 KB |
 
-LTO release build. Stock Zephyr, OpenThread and nrf_security, without UWB,
-credentials or DFU, take 275.9 KB flash and 86.8 KB RAM.
+LTO release build.
 
 ## Build
 
