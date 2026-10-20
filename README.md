@@ -1,143 +1,32 @@
 # tinylock
 
-The reference door lock built from tinytalk and its sibling libraries: a
-Matter Door Lock on an nRF52833 (DWM3001CDK), commissioned over BLE and
-operated over Thread. tinylock holds the one full-stack sample, the
-swappable stack fragments, the size matrix and the Apple Home gates. It owns
-no library code: every library comes in as a Zephyr module from the command
-line.
+A Matter door lock on an nRF52833 (DWM3001CDK): commissioned over BLE, run
+over Thread, unlocked by a phone over UWB. It owns no library code.
 
-## Libraries
+| Module      | Role          |     Flash |      RAM |
+| :---------- | :------------ | --------: | -------: |
+| tinytalk    | Matter node   |  53,836 B | 21,432 B |
+| tinygrid    | Thread child  |  19,721 B | 10,148 B |
+| tinypsa     | PSA Crypto    |  18,216 B |  1,501 B |
+| tinycred    | Aliro reader  |  12,955 B |  6,807 B |
+| tinyuwb     | UWB ranging   |   8,680 B |    958 B |
+| tinyble     | BLE host      |   6,895 B |  2,549 B |
+| tinyfota    | Delta DFU     |   4,804 B |  1,064 B |
+| Whole image |               | 202,648 B | 75,092 B |
 
-| Module | Role | Needed by |
-|---|---|---|
-| tinytalk | Matter node: PASE, CASE, Interaction Model, clusters | every build |
-| tinypsa | PSA Crypto provider, replaces nrf_security | `stacks/tinypsa.conf` |
-| tinyble | BLE peripheral host on Zephyr's own controller, replaces the Zephyr BT host | `stacks/tinyble.conf` with `stacks/tinyble.overlay`; `stacks/tinyble-sdc.conf` after it for the SoftDevice Controller |
-| tinygrid | Thread 1.1 child, replaces OpenThread | `stacks/tinygrid.conf` |
-| tinyfota | Signed in-place delta DFU, MCUboot applier | `stacks/tinyfota.conf`, or `stacks/tinyfota-tinyble.conf` with tinyble |
+LTO release build. Stock Zephyr, OpenThread and nrf_security, without UWB,
+credentials or DFU, take 282,496 B flash and 88,928 B RAM.
 
 ## Build
 
-`eval "$(./bootstrap)"` clones or updates every library next to this
-checkout, installs nrfutil and NCS v3.3.0 when they are missing, and sets
-`TINYLOCK_MODULES`. Then, from inside an nRF Connect SDK v3.3.0 workspace:
+```sh
+eval "$(./bootstrap)"   # fetches the modules, sets TINYLOCK_MODULES
 
-```
-west build -p always -b decawave_dwm3001cdk -d <tinylock>/build/<dir> <tinylock>/door-lock -- \
-  -DZEPHYR_EXTRA_MODULES="<tinytalk>;<other modules>" \
-  -DCONF_FILE="<fragments>"
+west build -b decawave_dwm3001cdk <tinylock>/door-lock -- \
+  -DZEPHYR_EXTRA_MODULES="$TINYLOCK_MODULES" -DCONF_FILE="<fragments>"
 ```
 
-`<tinytalk>` and the other module entries are paths to local checkouts.
-They go on the command line only, never into a file.
+One fragment per module in `door-lock/stacks/`. Leave `CONF_FILE` out for
+the stock stack. Add `overlay-release.conf` for release.
 
-## Fragments
-
-`door-lock/prj.conf` holds the lines every build shares;
-`door-lock/stacks/*.conf` holds one stack each. With no `CONF_FILE`, the
-sample builds the stock set:
-
-| Seam | Stock fragment | Library fragment |
-|---|---|---|
-| BLE | `stacks/bt-host.conf` | `stacks/tinyble.conf` with `stacks/tinyble.overlay` (Zephyr's controller), plus `stacks/tinyble-sdc.conf` for the SoftDevice Controller |
-| Thread | `stacks/openthread.conf` | `stacks/tinygrid.conf`, plus `stacks/tinygrid-radio.conf` for tinygrid's own radio driver in place of Nordic's |
-| Crypto | `stacks/nrf-security.conf` | `stacks/tinypsa.conf`, plus `stacks/tinypsa-openthread.conf` with OpenThread |
-| DFU | none | `stacks/tinyfota.conf` on the Zephyr host, `stacks/tinyfota-tinyble.conf` on tinyble |
-
-A swap replaces one stock fragment with its library fragment, for example
-`-DCONF_FILE="prj.conf;stacks/bt-host.conf;stacks/openthread.conf;stacks/tinypsa.conf;stacks/tinypsa-openthread.conf"`.
-`overlay-release.conf` drops logging and RTT for the release image.
-
-## Sizes
-
-The door-lock on decawave_dwm3001cdk, NCS v3.3.0, LTO on, from
-`scripts/size_matrix.sh` on 2026-10-17: tinylock 2fb2637, tinytalk 4e14cfc,
-tinyble 93eb8b3, tinygrid b8e3b4a, tinypsa d556143. The stock rows are built
-with tinytalk as the only module.
-
-| Set | Flash (B) | RAM (B) |
-|---|---|---|
-| stock | 304,584 | 97,440 |
-| stock+overlay-release | 282,496 | 88,928 |
-| tinyble+tinygrid+tinypsa | 207,144 | 69,592 |
-| tinyble+tinygrid+tinypsa+overlay-release | 195,048 | 61,208 |
-
-The last row is the release image with every library swapped in: 87,448 B
-less flash and 27,720 B less RAM than the stock release. It passed an Apple
-Home add, lock and unlock on the board on 2026-10-17.
-
-`stacks/tinygrid-radio.conf` after `stacks/tinygrid.conf` has tinygrid drive
-the radio itself, in MPSL timeslots, instead of linking Nordic's 802.15.4
-driver. The release set with and without it on 2026-10-18 (tinylock 208d96b,
-tinytalk 4e14cfc, tinyble 8ecda5d, tinygrid 8db2c23, tinypsa d556143):
-
-| Set | Flash (B) | RAM (B) |
-|---|---|---|
-| tinyble+tinygrid+tinypsa+overlay-release | 195,096 | 61,208 |
-| tinyble+tinygrid+tinygrid-radio+tinypsa+overlay-release | 172,448 | 58,968 |
-
-22,648 B less flash and 2,240 B less RAM. It passed an Apple Home add, lock
-and unlock on the board on 2026-10-18, the first run of tinygrid's driver
-on hardware.
-
-`stacks/tinyble.conf` with `stacks/tinyble.overlay` puts tinyble on
-Zephyr's own Bluetooth controller, and tinygrid's radio then runs as an
-event in that controller's scheduler, so no Nordic binary is linked (MPSL
-goes with the SoftDevice Controller). `stacks/tinyble-sdc.conf` after it
-is the SoftDevice Controller, the default until 2026-10-20. The full set
-with every library, tinyfota, tinyuwb and tinycred, release overlay, built
-with sysbuild on 2026-10-20:
-
-| Controller | Flash (B) | RAM (B) |
-|---|---|---|
-| SoftDevice Controller and MPSL | 217,652 | 74,584 |
-| Zephyr controller | 202,564 | 75,032 |
-
-15,088 B less flash and 448 B more RAM. On the board on 2026-10-20 the
-Zephyr-controller image passed an Apple Home add over BLE and Thread, then
-the credential transaction, UWB ranging and an approach unlock with the
-phone, Thread serving the Home subscriptions throughout.
-
-The same libraries set plus `stacks/tinyfota-tinyble.conf`, built with
-sysbuild and MCUboot from `stacks/tinyfota/` on 2026-10-17 (tinylock
-6e22bd8, tinyble 8ecda5d, tinyfota 7ec5d9c, the other modules as above):
-
-| Image | Flash (B) | RAM (B) |
-|---|---|---|
-| door-lock | 215,824 | 70,680 |
-| MCUboot | 25,512 | 14,464 |
-
-On the board on 2026-10-17 it passed an Apple Home add, then a delta
-update over SMP (`tinyfota push`, 4,186 B staged in 4.4 s) and one over
-tinyfota's native frames (`tinyfota push --native`, 4,177 B), with the
-fabrics kept and Home controlling the lock after each.
-
-### Where the release image goes
-
-The last row above, split by source. Each sized symbol in `zephyr.elf` is
-assigned to the file that defines it, from the DWARF debug info: code by the
-outermost frame `addr2line -i` gives for its address, data by the
-`DW_AT_decl_file` of its variable. Zephyr's `rom_report` cannot do this with
-LTO on: it puts 98% of the image under "(no paths)". LTO also inlines across
-modules, so code inlined from one library counts toward its caller. RAM
-includes initialised data, which also takes the same bytes in flash.
-
-| Component | Flash (B) | % of flash | RAM (B) | % of RAM |
-|---|---|---|---|---|
-| tinytalk (Matter) | 50,228 | 25.8% | 19,811 | 32.4% |
-| tinygrid (Thread) | 16,926 | 8.7% | 9,309 | 15.2% |
-| tinypsa (crypto) | 15,346 | 7.9% | 1,501 | 2.5% |
-| tinyble (BLE host) | 4,861 | 2.5% | 2,099 | 3.4% |
-| **tiny\* total** | **87,361** | **44.8%** | **32,720** | **53.5%** |
-| SoftDevice Controller and MPSL (Nordic binary libraries) | 51,426 | 26.4% | 3,202 | 5.2% |
-| Zephyr (kernel, drivers, subsystems, generated code) | 23,540 | 12.1% | 19,319 | 31.6% |
-| nRF 802.15.4 radio driver | 22,797 | 11.7% | 2,465 | 4.0% |
-| NCS and hal_nordic glue | 3,376 | 1.7% | 174 | 0.3% |
-| C library and compiler runtime | 2,026 | 1.0% | 0 | 0% |
-| door-lock app | 954 | 0.5% | 156 | 0.3% |
-| Unattributed and alignment padding | 3,568 | 1.8% | 3,172 | 5.2% |
-
-## License
-
-Apache-2.0, see LICENSE and NOTICE. Every tiny* library is Apache-2.0 as well.
+Apache-2.0
