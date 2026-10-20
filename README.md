@@ -29,4 +29,19 @@ west build -b decawave_dwm3001cdk <tinylock>/door-lock -- \
 One fragment per module in `door-lock/stacks/`. Leave `CONF_FILE` out for
 the stock stack. Add `overlay-release.conf` for release.
 
+<details>
+<summary>The whole image, as measured</summary>
+
+```sh
+west build -b decawave_dwm3001cdk <tinylock>/door-lock -- \
+  -DZEPHYR_EXTRA_MODULES="$TINYLOCK_MODULES" \
+  -DCONF_FILE="prj.conf;stacks/tinyble.conf;stacks/tinygrid.conf;stacks/tinygrid-radio.conf;stacks/tinypsa.conf;stacks/tinyfota-tinyble.conf;stacks/tinyuwb.conf;stacks/tinycred.conf;overlay-release.conf" \
+  -DEXTRA_DTC_OVERLAY_FILE="stacks/tinyuwb.overlay;stacks/tinyble.overlay" \
+  -DSB_CONF_FILE=stacks/tinyfota/sysbuild.conf \
+  -DPM_STATIC_YML_FILE=stacks/tinyfota/pm_static.yml \
+  -Dmcuboot_CONF_FILE=<tinylock>/door-lock/stacks/tinyfota/mcuboot.conf
+```
+
+</details>
+
 Apache-2.0
