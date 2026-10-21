@@ -3,12 +3,14 @@
 # missing. Safe to run again. Builds nothing.
 #
 #   eval "$(./bootstrap)"
+#   eval "$(./bootstrap --locked)"   # to rebuild a release
 #
 # Each library is cloned from where this repository's origin points, into
 # ../<library>. A checkout already there is checked, fetched and
 # fast-forwarded when it is clean and tracks a branch; otherwise it is left
 # as it is. nrfutil comes from Homebrew when it is missing, then NCS v3.3.0
-# (SDK and toolchain) from nrfutil sdk-manager.
+# (SDK and toolchain) from nrfutil sdk-manager. With --locked, each library
+# is checked out, detached, at the commit modules.lock names instead.
 #
 # Progress goes to stderr. Only when every step succeeds does stdout get
 # the TINYLOCK_MODULES line for scripts/size_matrix.sh, so the eval above
@@ -16,10 +18,20 @@
 
 set -u
 
-libs="tinytalk tinyble tinypsa tinygrid tinyfota"
+libs="tinytalk tinyble tinypsa tinygrid tinyfota tinyuwb tinycred"
 ncs=v3.3.0
 here=$(cd "$(dirname "$0")" && pwd)
 parent=$(dirname "$here")
+locked=
+case "${1:-}" in
+--locked) locked=1 ;;
+"") ;;
+*) echo "usage: $0 [--locked]" >&2; exit 2 ;;
+esac
+if [ -n "$locked" ] && [ ! -f "$here/modules.lock" ]; then
+	echo "no modules.lock in $here" >&2
+	exit 1
+fi
 origin=$(git -C "$here" remote get-url origin) || {
 	echo "no origin remote in $here: the libraries are cloned from next to it" >&2
 	exit 1
@@ -34,6 +46,21 @@ slug() {
 	echo "${s##*[:/]}/$name"
 }
 
+# Checks a library out at the commit modules.lock names. Fails when it cannot.
+pin() {
+	commit=$(awk -v l="$1" '$1 == l { print $2 }' "$here/modules.lock")
+	if [ -z "$commit" ]; then
+		echo "$1: not in modules.lock" >&2
+		return 1
+	fi
+	if [ -n "$(git -C "$2" status --porcelain)" ]; then
+		echo "$1: local changes: cannot check out $commit" >&2
+		return 1
+	fi
+	git -C "$2" checkout -q --detach "$commit" || return 1
+	echo "$1: at $(git -C "$2" rev-parse --short HEAD), from modules.lock" >&2
+}
+
 # Clones or updates one library. Fails when it cannot be used.
 library() {
 	lib=$1
@@ -42,6 +69,10 @@ library() {
 	if [ ! -e "$dir" ]; then
 		echo "$lib: cloning into $dir" >&2
 		git clone -q "$want" "$dir" || return 1
+		if [ -n "$locked" ]; then
+			pin "$lib" "$dir"
+			return
+		fi
 		return 0
 	fi
 	if ! git -C "$dir" rev-parse -q --verify HEAD >/dev/null 2>&1; then
@@ -55,6 +86,9 @@ library() {
 	fi
 	if ! git -C "$dir" fetch -q origin; then
 		echo "$lib: fetch failed: using it as it is" >&2
+	elif [ -n "$locked" ]; then
+		pin "$lib" "$dir"
+		return
 	elif [ -n "$(git -C "$dir" status --porcelain)" ]; then
 		echo "$lib: local changes: not updated" >&2
 	elif git -C "$dir" merge -q --ff-only '@{u}' >/dev/null 2>&1; then
