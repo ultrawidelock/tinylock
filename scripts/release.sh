@@ -14,8 +14,8 @@
 # <version> and that every library sits at its locked commit; builds the whole
 # image from nothing, signed with TINYLOCK_KEY (MCUboot and tinyfota both trust
 # it); runs tinyfota release against each earlier release's app image; leaves
-# everything to publish in build/release/v<version>/; and tags v<version>,
-# signed. The SDK is taken from NCS, by default /opt/nordic/ncs/v3.3.0.
+# the four release files and NOTES.md in build/release/v<version>/; and tags
+# v<version>, signed. The SDK is taken from NCS, by default /opt/nordic/ncs/v3.3.0.
 #
 # Keep every published *-app.signed.hex: a later update can only be built
 # against it, and no build reproduces it byte for byte.
@@ -130,31 +130,37 @@ build() {
 	cp "$b/merged.hex" "$out/tinylock-$tag-factory.hex"
 	cp "$app" "$out/tinylock-$tag-app.signed.hex"
 	cp "$b/dfu_application.zip" "$out/tinylock-$tag-dfu.zip"
-	cp "$lockfile" "$out/modules.lock"
 	(cd "$out" && zip -qr "tinylock-$tag-ota.zip" ota) || die "could not zip $out/ota"
+	# One line per paragraph: GitHub renders every newline in release notes.
 	cat >"$out/NOTES.md" <<EOF
-Matter door lock firmware for the DWM3001CDK (nRF52833): commissioned over
-BLE, run over Thread, unlocked by a phone over UWB. tinylock
-$(git -C "$here" rev-parse --short HEAD), the libraries in \`modules.lock\`, NCS $ncs.
+Matter door lock firmware for the DWM3001CDK (nRF52833): commissioned over BLE, run over Thread, unlocked by a phone over UWB.
 
-| File | Use |
-| :--- | :--- |
-| \`tinylock-$tag-factory.hex\` | A blank board: MCUboot and the app. Erase the chip first. |
-| \`tinylock-$tag-app.signed.hex\` | The app alone, and the base of every later update. |
-| \`tinylock-$tag-dfu.zip\` | An update over Bluetooth with nRF Device Manager. |
-| \`tinylock-$tag-ota.zip\` | tinyfota updates and the browser updater's index. |
+### Flash
 
-Test accessory: Matter test attestation, setup code $code on every board.
+\`\`\`sh
+nrfutil install device
+nrfutil device program --firmware tinylock-$tag-factory.hex \\
+  --options chip_erase_mode=ERASE_ALL
+\`\`\`
 
-Unofficial. Not affiliated with, endorsed or certified by any company or
-standards body named here. Trademarks belong to their owners.
+Then add the lock in Apple Home with setup code \`$code\`. Home flags it as uncertified: it carries Matter's test attestation, and every board shares that code.
+
+### Files
+
+- **factory.hex**: a blank board, MCUboot and the app
+- **dfu.zip**: an update over Bluetooth with nRF Device Manager
+- **ota.zip**: tinyfota updates and the browser updater's index
+- **app.signed.hex**: the app alone, the base of every later update
+
+Built from $(git -C "$here" rev-parse --short HEAD) with the libraries in \`modules.lock\` and NCS $ncs. \`./bootstrap --locked\` at \`$tag\` rebuilds it.
+
+Unofficial. Not affiliated with, endorsed or certified by any company or standards body named here. Trademarks belong to their owners.
 EOF
-	(cd "$out" && shasum -a 256 "tinylock-$tag-"* modules.lock >SHA256SUMS) || die "could not write SHA256SUMS"
 	git -C "$here" tag -s "$tag" -m "tinylock $tag" || die "could not tag $tag"
 
 	echo "release $tag ready in $out" >&2
 	echo "  git -C $here push origin $tag" >&2
-	echo "  gh release create $tag --draft --title 'tinylock $tag' --notes-file $out/NOTES.md $out/tinylock-$tag-* $out/modules.lock $out/SHA256SUMS" >&2
+	echo "  gh release create $tag --draft --title 'tinylock $tag' --notes-file $out/NOTES.md $out/tinylock-$tag-*" >&2
 }
 
 case "${1:-}" in
