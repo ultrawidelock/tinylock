@@ -22,6 +22,7 @@
  * for FACTORY_RESET_MS erases the stored fabrics and reboots. In a tinyfota
  * build the short press also opens the update window.
  */
+#include <app_version.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/fs/nvs.h>
 #include <zephyr/kernel.h>
@@ -64,7 +65,8 @@ static const struct matter_commission_config s_matter_cfg = {
 	.iterations = CONFIG_TINYTALK_SPAKE2P_ITERATIONS,
 	.product_name = "tinytalk door lock",
 	.hardware_version = 1u,
-	.software_version = 1u,
+	.software_version = APP_VERSION_NUMBER,
+	.software_version_str = APP_VERSION_STRING,
 	.endpoints = &tm_door_lock_endpoint,
 	.n_endpoints = 1u,
 };
