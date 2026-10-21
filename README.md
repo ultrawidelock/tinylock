@@ -26,7 +26,8 @@ west build -b decawave_dwm3001cdk <tinylock>/door-lock -- \
 ```
 
 One fragment per module in `door-lock/stacks/`. Leave `CONF_FILE` out for
-the stock stack. Add `overlay-release.conf` for release.
+the stock stack. Add `overlay-release.conf` for release. A release pins every
+library in `modules.lock`; `./bootstrap --locked` checks those commits out.
 
 <details>
 <summary>The whole image, as measured</summary>
